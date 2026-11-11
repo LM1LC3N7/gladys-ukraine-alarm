@@ -6,6 +6,8 @@ uses [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-11
+
 ### Added
 
 - Ukrainian air raid alerts from the official API of alerts.in.ua (v2 IoT
@@ -30,3 +32,6 @@ uses [semantic versioning](https://semver.org/).
 - The test button sends one request for clicks of the same moment; the token
   goes only over https to api.alerts.in.ua; levels aged on the monotonic clock;
   levels written to /data before the scene events.
+
+[Unreleased]: https://github.com/LM1LC3N7/gladys-ukraine-alarm/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/LM1LC3N7/gladys-ukraine-alarm/releases/tag/v0.1.1

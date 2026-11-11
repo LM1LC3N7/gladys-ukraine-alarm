@@ -6,8 +6,8 @@
     "en": "Unofficial connector: Ukrainian air raid alerts by oblast, raion or hromada (alerts.in.ua).",
     "fr": "Connecteur non officiel : alertes aériennes ukrainiennes par oblast, raion ou hromada."
   },
-  "version": "0.1.0",
-  "docker_image": "ghcr.io/lm1lc3n7/gladys-ukraine-alarm:0.1.0",
+  "version": "0.1.1",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-ukraine-alarm:0.1.1",
   "gladys_version": ">=5.1.0",
   "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/gladys-ukraine-alarm/main/cover.png",
   "categories": ["security", "environment"],

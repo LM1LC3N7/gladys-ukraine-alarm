@@ -1,6 +1,6 @@
 {
   "name": "gladys-ukraine-alarm",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Gladys Assistant external integration for the Ukrainian air raid alerts by oblast, raion or hromada, read from the official API of alerts.in.ua. Unofficial, not affiliated with alerts.in.ua.",
   "type": "module",
