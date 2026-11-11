@@ -108,7 +108,8 @@ plus de 2 heures n’est pas comparé : aucun déclenchement pour un changement 
 date peut-être de plusieurs heures. Les nouveaux niveaux sont écrits dans le
 dossier de l’intégration avant les déclenchements ; si ce dossier n’est pas
 inscriptible, un déclenchement peut partir une seconde fois après un
-redémarrage (au moins une fois, jamais perdu).
+redémarrage (au moins une fois ; pas perdu, sauf arrêt de l’intégration ou changement
+de jeton à cet instant précis).
 
 ## Limites
 

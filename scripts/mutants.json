@@ -244,5 +244,23 @@
     "file": "src/app.js",
     "from": "    await this.save();\n    for (const change of changes) {",
     "to": "    for (const change of changes) {"
+  },
+  {
+    "name": "events fired after a stop",
+    "file": "src/app.js",
+    "from": "if (!this.running || generation !== this.generation) {\n        return;\n      }\n      await this.fireEvents(change);",
+    "to": "await this.fireEvents(change);"
+  },
+  {
+    "name": "Last-Modified kept for a new token",
+    "file": "src/app.js",
+    "from": "      this.nextDue = -Infinity;\n      this.lastModified = null;\n",
+    "to": "      this.nextDue = -Infinity;\n"
+  },
+  {
+    "name": "no heartbeat",
+    "file": "src/app.js",
+    "from": "{ heartbeat: STATE_HEARTBEAT }",
+    "to": "{}"
   }
 ]

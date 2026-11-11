@@ -104,7 +104,8 @@ meanwhile fires its trigger with "seen late" set. A level older than 2 hours
 is not compared: no trigger for a change that may be hours old. The new levels
 are written to the integration folder before the triggers fire; if that folder
 cannot be written, a trigger may fire a second time after a restart (at least
-once, never lost).
+once; not lost, unless the integration stops or the token changes at that
+very moment).
 
 ## Limits
 

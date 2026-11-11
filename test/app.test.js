@@ -813,3 +813,41 @@ test('a click while a read hangs answers at once from the last one, without wait
   held[0](answer(statuses()));
   await env.wait(0);
 });
+
+test('stopped while the levels are written before the events: no event fires', async () => {
+  const store = createMemoryStore();
+  const env = await setup({ store });
+  await env.wait(0);
+  const save = store.save.bind(store);
+  let release;
+  store.save = (data) =>
+    data.levels?.['31']?.level === 3
+      ? new Promise((resolve) => (release = resolve)).then(() => save(data))
+      : save(data);
+  env.net.current = statuses({ 31: 'R' });
+  await env.wait(30 * SECOND);
+  assert.equal(env.gladys.fake.lastState(F(31)), 3);
+  assert.equal(typeof release, 'function', 'the save before the events is pending');
+  const stopping = env.app.stop();
+  release();
+  await stopping;
+  await env.flush();
+  assert.deepEqual(env.gladys.fake.sceneEvents, []);
+});
+
+test('a new token starts without If-Modified-Since; states carry a heartbeat', async (t) => {
+  const env = await setup();
+  t.after(() => env.app.stop());
+  const options = [];
+  const publish = env.gladys.publishChangedStates.bind(env.gladys);
+  env.gladys.publishChangedStates = (states, opts) => {
+    options.push(opts);
+    return publish(states, opts);
+  };
+  await env.wait(30 * SECOND);
+  assert.ok(env.net.calls[1].init.headers['If-Modified-Since']);
+  await env.gladys.fake.configUpdated({ ...CONFIG, api_token: 'NewToken1234567890' });
+  await env.wait(0);
+  assert.equal(env.net.calls.at(-1).init.headers['If-Modified-Since'], undefined);
+  assert.deepEqual(options[0], { heartbeat: HOUR });
+});
