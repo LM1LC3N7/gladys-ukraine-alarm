@@ -31,18 +31,35 @@ pushing.
 ## Architecture
 
 ```
-index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
-src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
+index.js                          SDK wiring only (handlers registered before connect())
+src/handlers.js                   the SDK handlers, action and scene trigger keys
+src/app.js                        the read loop: pace, pauses, refused token, /data, statuses, events
+src/api.js                        the only network code: GET of the v2 IoT statuses, bounded
 src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
-gladys-assistant-integration.json manifest: name, config_schema, actions, image...
+src/constants.js                  every number (interval, pauses, limits)
+src/devices.js                    one device per location UID, its `level` feature
+src/locations.js                  UID -> name (oblasts, raions, cities), search
+src/i18n.js                       statuses and button answers, en/fr
+src/store.js                      /data state file (missing / read / unreadable told apart)
+gladys-assistant-integration.json manifest
 docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
-test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
-.github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
+test/                             node --test, SDK fake Gladys, fake clock, real-clock test
+scripts/cover.mjs                 generates cover.png (800x534, no dependency)
+scripts/mutants.mjs, mutants.json mutation check of the guards (memcap node scripts/mutants.mjs)
 ```
+
+Integration rules of this module (keep them true):
+
+- Only `api.alerts.in.ua` (the official API, token of the user). Never
+  `api.ukrainealarm.com` (anti-bot challenge).
+- One request per interval reads every location; one request in flight; never
+  faster than the interval (restart included: the attempt is in /data before the
+  request); 20 s minimum (the API allows 8-10 requests a minute per IP).
+- 401 = refused token (stop, salted 8-bit tag in /data, lifted by a new token or
+  a successful test). 403, 5xx, timeouts, cut or unreadable bodies are never a
+  refusal. 429: Retry-After (vs the Date header), 1 min to 6 h, persisted.
+- The token never appears in logs, statuses, /data or events.
+- Decisions on the monotonic clock; the wall clock only dates /data and statuses.
 
 ## Rules
 

@@ -1,177 +1,302 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "Ukraine Alarm (alerts.in.ua)",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Unofficial connector: Ukrainian air raid alerts by oblast, raion or hromada (alerts.in.ua).",
+    "fr": "Connecteur non officiel : alertes aériennes ukrainiennes par oblast, raion ou hromada."
   },
-  "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
+  "version": "0.1.0",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-ukraine-alarm:0.1.0",
   "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/gladys-ukraine-alarm/main/cover.png",
+  "categories": ["security", "environment"],
+  "transports": ["cloud"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
+      "label": {
+        "en": "Ukrainian air raid alerts in Gladys",
+        "fr": "Les alertes aériennes ukrainiennes dans Gladys"
+      },
       "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+        "en": "Unofficial connector, not affiliated with alerts.in.ua. It reads the official API of alerts.in.ua with your own free token (request it with the form linked below) and gives one device per location you watch (oblast, raion, hromada or city, by its UID) with its alert level: 0 no alert, 1 alert in part of it, 2 yellow level, 3 red level. The scene triggers \"Alert started\" and \"Alert ended\" fire on each change. One request reads every location, every 30 s by default. This is NOT a safety system: delays happen, rely on the official channels (sirens, the Air Alert app). Never tested with a real token.",
+        "fr": "Connecteur non officiel, sans lien avec alerts.in.ua. Il lit l’API officielle d’alerts.in.ua avec votre propre jeton gratuit (à demander par le formulaire en lien ci-dessous) et donne un appareil par lieu suivi (oblast, raion, hromada ou ville, par son UID) avec son niveau d’alerte : 0 aucune alerte, 1 alerte sur une partie, 2 niveau jaune, 3 niveau rouge. Les déclencheurs de scène « Alerte commencée » et « Alerte terminée » partent à chaque changement. Une requête lit tous les lieux, toutes les 30 s par défaut. Ce n’est PAS un système de sécurité : des retards arrivent, fiez-vous aux canaux officiels (sirènes, application Air Alert). Jamais testé avec un vrai jeton."
       },
       "links": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "url": "https://alerts.in.ua/api-request",
+          "label": {
+            "en": "Request a free token (alerts.in.ua form)",
+            "fr": "Demander un jeton gratuit (formulaire alerts.in.ua)"
+          }
+        },
+        {
+          "url": "https://docs.google.com/spreadsheets/d/1XnTOzcPHd1LZUrarR1Fk43FUyl8Ae6a6M7pcwDRjNdA/edit?usp=sharing",
+          "label": {
+            "en": "Full list of the location UIDs (hromadas included)",
+            "fr": "Liste complète des UID des lieux (hromadas comprises)"
+          }
+        },
+        {
+          "url": "https://devs.alerts.in.ua/",
+          "label": {
+            "en": "alerts.in.ua API (the API this integration relies on)",
+            "fr": "API alerts.in.ua (l’API utilisée par cette intégration)"
+          }
+        },
+        {
+          "url": "https://github.com/LM1LC3N7/gladys-ukraine-alarm/blob/main/docs/en.md",
+          "label": {
+            "en": "Step-by-step guide",
+            "fr": "Guide pas à pas (anglais)"
+          }
+        },
+        {
+          "url": "https://github.com/LM1LC3N7/gladys-ukraine-alarm/blob/main/docs/fr.md",
+          "label": {
+            "en": "Guide (French)",
+            "fr": "Guide pas à pas"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
+      "key": "api_token",
+      "type": "secret",
       "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
+      "label": {
+        "en": "alerts.in.ua API token",
+        "fr": "Jeton de l’API alerts.in.ua"
+      },
+      "description": {
+        "en": "The free personal token alerts.in.ua sends you by e-mail. Kept by Gladys in its database, never shown again, sent only to alerts.in.ua.",
+        "fr": "Le jeton personnel gratuit qu’alerts.in.ua vous envoie par e-mail. Gardé par Gladys dans sa base, jamais réaffiché, envoyé seulement à alerts.in.ua."
+      }
     },
     {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
+      "key": "locations",
+      "type": "string",
       "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
-    },
-    {
-      "key": "unit",
-      "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
-      "required": false,
-      "default": "celsius",
-      "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
-      ]
-    },
-    {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
-      "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+      "label": {
+        "en": "Locations to watch (UIDs)",
+        "fr": "Lieux à suivre (UID)"
       },
+      "description": {
+        "en": "The UIDs of the locations, separated by commas (20 at most). Kyiv city is 31, Kyiv Oblast 14, Kharkiv city 1293. The button \"Find a location\" below gives the UID of an oblast, a raion or a city; a hromada: see the full list linked above.",
+        "fr": "Les UID des lieux, séparés par des virgules (20 au plus). Kyiv (ville) est 31, l’oblast de Kyiv 14, Kharkiv (ville) 1293. Le bouton « Chercher un lieu » ci-dessous donne l’UID d’un oblast, d’un raion ou d’une ville ; une hromada : voir la liste complète en lien ci-dessus."
+      },
+      "placeholder": {
+        "en": "31, 14",
+        "fr": "31, 14"
+      }
+    },
+    {
+      "key": "read_interval",
+      "type": "number",
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "default": 30,
+      "min": 20,
+      "max": 600,
+      "label": {
+        "en": "Read interval (seconds)",
+        "fr": "Intervalle de lecture (secondes)"
+      },
+      "description": {
+        "en": "One request per interval reads every location. alerts.in.ua allows 8 to 10 requests a minute per Internet address, other applications included: 20 s at the fastest.",
+        "fr": "Une requête par intervalle lit tous les lieux. alerts.in.ua admet 8 à 10 requêtes par minute et par adresse Internet, autres applications comprises : 20 s au plus rapide."
+      }
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
+      "key": "test_connection",
+      "timeout_seconds": 60,
+      "label": {
+        "en": "Test the connection",
+        "fr": "Tester la connexion"
+      },
+      "description": {
+        "en": "Reads alerts.in.ua with the token saved and shows the level of each location (no new request less than 20 s after the last one).",
+        "fr": "Lit alerts.in.ua avec le jeton enregistré et montre le niveau de chaque lieu (pas de nouvelle requête moins de 20 s après la dernière)."
+      }
     },
     {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
+      "key": "find_location",
+      "timeout_seconds": 30,
+      "label": {
+        "en": "Find a location",
+        "fr": "Chercher un lieu"
+      },
+      "description": {
+        "en": "Finds the oblasts, raions and cities whose name holds the words typed (Ukrainian or Latin letters), with their UID. No request to alerts.in.ua.",
+        "fr": "Trouve les oblasts, raions et villes dont le nom contient les mots saisis (lettres ukrainiennes ou latines), avec leur UID. Aucune requête à alerts.in.ua."
+      },
       "fields": [
         {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
+          "key": "query",
+          "type": "string",
+          "required": true,
+          "label": {
+            "en": "Part of the name",
+            "fr": "Partie du nom"
+          },
+          "placeholder": {
+            "en": "Kharkiv",
+            "fr": "Kharkiv"
+          }
         }
       ]
     }
   ],
   "scene_triggers": [
     {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "alert_started",
+      "label": {
+        "en": "Air raid alert started",
+        "fr": "Alerte aérienne commencée"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "An alert of yellow or red level started on the whole location, or a yellow alert turned red. Not a safety system.",
+        "fr": "Une alerte de niveau jaune ou rouge a commencé sur tout le lieu, ou une alerte jaune est passée au rouge. Pas un système de sécurité."
       },
       "fields": [
         {
-          "key": "device",
+          "key": "location",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
+          "required": false,
+          "label": {
+            "en": "Location (empty: any)",
+            "fr": "Lieu (vide : n’importe lequel)"
+          }
         },
         {
-          "key": "target",
+          "key": "level",
           "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
+          "required": false,
+          "label": {
+            "en": "Level (empty: any)",
+            "fr": "Niveau (vide : n’importe lequel)"
+          },
           "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
+            {
+              "value": "yellow",
+              "label": {
+                "en": "Yellow",
+                "fr": "Jaune"
+              }
+            },
+            {
+              "value": "red",
+              "label": {
+                "en": "Red",
+                "fr": "Rouge"
+              }
+            }
           ]
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "location_name",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
+          "label": {
+            "en": "Location",
+            "fr": "Lieu"
+          }
+        },
+        {
+          "key": "uid",
+          "type": "number",
+          "label": {
+            "en": "Location UID",
+            "fr": "UID du lieu"
+          }
+        },
+        {
+          "key": "level",
+          "type": "string",
+          "label": {
+            "en": "Level (yellow or red)",
+            "fr": "Niveau (yellow ou red)"
+          }
+        },
+        {
+          "key": "escalated",
+          "type": "boolean",
+          "label": {
+            "en": "Yellow alert turned red",
+            "fr": "Alerte jaune passée au rouge"
+          }
+        },
+        {
+          "key": "late",
+          "type": "boolean",
+          "label": {
+            "en": "Seen late (after a restart or an outage)",
+            "fr": "Vue en retard (après un redémarrage ou une panne)"
+          }
         }
       ]
-    }
-  ],
-  "scene_actions": [
+    },
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
+      "key": "alert_ended",
+      "label": {
+        "en": "Air raid alert ended",
+        "fr": "Alerte aérienne terminée"
       },
-      "timeout_seconds": 15,
+      "description": {
+        "en": "The alert of yellow or red level on the whole location ended (no alert, or an alert in part of it only).",
+        "fr": "L’alerte de niveau jaune ou rouge sur tout le lieu est terminée (plus d’alerte, ou une alerte sur une partie seulement)."
+      },
       "fields": [
         {
-          "key": "device",
+          "key": "location",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
+          "required": false,
+          "label": {
+            "en": "Location (empty: any)",
+            "fr": "Lieu (vide : n’importe lequel)"
+          }
         }
       ],
-      "outputs": [
+      "variables": [
         {
-          "key": "signalled",
+          "key": "location_name",
+          "type": "string",
+          "label": {
+            "en": "Location",
+            "fr": "Lieu"
+          }
+        },
+        {
+          "key": "uid",
+          "type": "number",
+          "label": {
+            "en": "Location UID",
+            "fr": "UID du lieu"
+          }
+        },
+        {
+          "key": "duration_minutes",
+          "type": "number",
+          "label": {
+            "en": "Duration of the alert (min, empty when unknown)",
+            "fr": "Durée de l’alerte (min, vide si inconnue)"
+          }
+        },
+        {
+          "key": "late",
           "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "label": {
+            "en": "Seen late (after a restart or an outage)",
+            "fr": "Vue en retard (après un redémarrage ou une panne)"
+          }
         }
       ]
-    }
-  ],
-  "widgets": [
-    {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
-      },
-      "icon": "activity",
-      "action_timeout_seconds": 15
     }
   ]
 }

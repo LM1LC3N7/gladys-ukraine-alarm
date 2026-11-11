@@ -1,0 +1,170 @@
+[
+  {
+    "name": "refused token: automatic reads not stopped",
+    "file": "src/app.js",
+    "from": "    if (this.refused) return 'refused';\n",
+    "to": ""
+  },
+  {
+    "name": "a new token does not lift the refusal",
+    "file": "src/app.js",
+    "from": "if (this.refused && !this.refusalMatches(next.token)) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "refusal from /data not restored",
+    "file": "src/app.js",
+    "from": "        this.refused = candidate;\n",
+    "to": ""
+  },
+  {
+    "name": "refusal from /data kept under another token",
+    "file": "src/app.js",
+    "from": "if (!this.config.token || tagOf(candidate.salt, this.config.token) === candidate.tag) {",
+    "to": "if (true) {"
+  },
+  {
+    "name": "the token in /data",
+    "file": "src/app.js",
+    "from": "? { salt: this.refused.salt, tag: this.refused.tag, status: this.refused.status }",
+    "to": "? this.refused"
+  },
+  {
+    "name": "pause not honoured",
+    "file": "src/app.js",
+    "from": "    if (this.pausedAt(mono)) return 'paused';\n",
+    "to": ""
+  },
+  {
+    "name": "pause unbounded",
+    "file": "src/app.js",
+    "from": "Math.min(PAUSE_MAX, Math.max(PAUSE_MIN, asked ?? base * 2 ** (count - 1)))",
+    "to": "asked ?? base * 2 ** (count - 1)"
+  },
+  {
+    "name": "pause without its minimum",
+    "file": "src/app.js",
+    "from": "Math.min(PAUSE_MAX, Math.max(PAUSE_MIN, asked ?? base * 2 ** (count - 1)))",
+    "to": "Math.min(PAUSE_MAX, asked ?? base * 2 ** (count - 1))"
+  },
+  {
+    "name": "403 taken for a refusal",
+    "file": "src/api.js",
+    "from": "if (status === 403) throw new ApiError('denied', { status });",
+    "to": "if (status === 403) throw new ApiError('refused', { status });"
+  },
+  {
+    "name": "401 not a refusal",
+    "file": "src/api.js",
+    "from": "if (status === 401) throw new ApiError('refused', { status });",
+    "to": "if (status === 401) throw new ApiError('server', { status });"
+  },
+  {
+    "name": "attempt not in /data before the request",
+    "file": "src/app.js",
+    "from": "    // The attempt is in /data before the request: a restart never reads sooner.\n    await this.save();\n",
+    "to": ""
+  },
+  {
+    "name": "restart ignores the last attempt",
+    "file": "src/app.js",
+    "from": "this.nextDue = mono + Math.min(wait, Math.max(0, attempt.at + wait - now));",
+    "to": "this.nextDue = -Infinity;"
+  },
+  {
+    "name": "no backoff of the failures",
+    "file": "src/app.js",
+    "from": "return Math.max(interval, Math.min(BACKOFF_MAX, interval * 2 ** (failures - 1)));",
+    "to": "return interval;"
+  },
+  {
+    "name": "body not cut",
+    "file": "src/api.js",
+    "from": "if (size > MAX_BODY_BYTES) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "redirect followed",
+    "file": "src/api.js",
+    "from": "redirect: 'manual'",
+    "to": "redirect: 'follow'"
+  },
+  {
+    "name": "token sent to another host",
+    "file": "src/api.js",
+    "from": "if (new URL(url).host !== API_HOST) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "Retry-After date against the local clock",
+    "file": "src/api.js",
+    "from": "const date = Date.parse(headers.get('date') ?? '');",
+    "to": "const date = Date.now();"
+  },
+  {
+    "name": "old level compared after 2 h",
+    "file": "src/app.js",
+    "from": "const known = previous && now - previous.at <= EVENT_MEMORY ? previous : null;",
+    "to": "const known = previous ?? null;"
+  },
+  {
+    "name": "no escalation event",
+    "file": "src/app.js",
+    "from": "(!isAlert(before.level) || level > before.level)",
+    "to": "!isAlert(before.level)"
+  },
+  {
+    "name": "no end event",
+    "file": "src/app.js",
+    "from": "} else if (!isAlert(level) && isAlert(before.level)) {",
+    "to": "} else if (false) {"
+  },
+  {
+    "name": "late answer of the old token published",
+    "file": "src/app.js",
+    "from": "      if (generation !== this.generation) {\n        return { ok: false, code: 'stale' };\n      }\n      if (!answer.notModified) {",
+    "to": "      if (!answer.notModified) {"
+  },
+  {
+    "name": "test button faster than 20 s",
+    "file": "src/app.js",
+    "from": "if (this.attemptMono !== null && mono - this.attemptMono < TEST_SPACING) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "never stale",
+    "file": "src/app.js",
+    "from": "this.readingMono === null || mono - this.readingMono > STALE_AFTER",
+    "to": "this.readingMono === null"
+  },
+  {
+    "name": "/data written over while unreadable",
+    "file": "src/app.js",
+    "from": "    if (this.storeState !== 'ok') {\n      return false;\n    }\n",
+    "to": ""
+  },
+  {
+    "name": "old levels republished as new",
+    "file": "src/app.js",
+    "from": "if (this.isFresh(this.monotonic())) {",
+    "to": "if (true) {"
+  },
+  {
+    "name": "any token accepted",
+    "file": "src/config.js",
+    "from": "return token.length <= MAX_TOKEN_LENGTH && TOKEN.test(token) ? 'ok' : 'invalid';",
+    "to": "return 'ok';"
+  },
+  {
+    "name": "partial counted as alert",
+    "file": "src/app.js",
+    "from": "const isAlert = (level) => level >= LEVEL.YELLOW;",
+    "to": "const isAlert = (level) => level >= LEVEL.PARTIAL;"
+  },
+  {
+    "name": "body read not stopped by the timeout",
+    "file": "src/api.js",
+    "from": "      if (signal.aborted) {\n        throw new ApiError('timeout');\n      }\n      if (done) {",
+    "to": "      if (done) {"
+  }
+]

@@ -1,61 +1,127 @@
-# Demo Devices Template
+# Ukraine Alarm (alerts.in.ua)
 
-This is the user documentation of the integration. Gladys re-hosts this file
-and shows a permanent **Documentation** link to it in the Configuration screen
-(in the user's language, with English as the fallback) — it is when
-configuring that the user needs it most. Keep the short onboarding hints in
-the `section` blocks of the manifest `config_schema`; put the long
-step-by-step (screenshots, troubleshooting…) here.
+Ukrainian air raid alerts in Gladys, by oblast, raion, hromada or city, read
+from the official API of [alerts.in.ua](https://alerts.in.ua).
+
+Unofficial connector, not affiliated with alerts.in.ua. Never tested with a
+real token: written from the official API documentation; please report what
+you see.
+
+**This is NOT a safety system.** The data comes with delays (technical or
+human) and the integration reads it every 30 s by default. Rely on the official
+channels: sirens, the Air Alert app, the local authorities.
 
 ## What you get
 
-Six demo devices show up after installation: a weather station (real data
-from Open-Meteo), a switch, a dimmable light, a smart plug with power
-metering, a motion sensor and a camera.
+- One device per location you watch, with one feature, **Alert level**:
+  - `0` no alert;
+  - `1` alert in part of the location (some of its raions or hromadas, not the
+    whole of it);
+  - `2` alert of yellow level;
+  - `3` alert of red level.
+- Two scene triggers:
+  - **Air raid alert started**: an alert of yellow or red level started on the
+    whole location, or a yellow alert turned red. Filters: the location (empty:
+    any) and the level (empty: any). Information passed to the scene: the
+    location name, its UID, the level (`yellow` or `red`), whether a yellow
+    alert turned red, and whether the change was seen late (see below).
+  - **Air raid alert ended**: the alert of yellow or red level on the whole
+    location ended (level 0 or 1). Information: the location name, its UID, the
+    duration in minutes (empty when the start was not seen) and "seen late".
+- The level is also a normal device state: a scene can test it (for example
+  "Alert level of Kyiv is 2 or more").
 
-## Configuration
+A level 1 (alert in part of the location) fires no trigger: watch the smallest
+location that holds your home (its hromada or its raion) to know whether the
+alert concerns it.
 
-1. Open the **Configuration** tab of the integration.
-2. Set the **latitude** and **longitude** the demo weather station should
-   observe (they default to Paris), and pick your temperature unit.
-   The **refresh interval** sets how often the weather station and the
-   plug's power are read: every 5 minutes by default, every minute at most.
-3. Save: the devices appear in the **Discovery** tab, ready to be added.
+## Step 1: get a token
 
-The **Prefer the local connection** toggle drives the demo plug: it reports
-the channel it actually uses as a badge (local or cloud), with an orange dot
-when it runs degraded (local refused, cloud fallback).
+Request a free personal token with the form of alerts.in.ua:
+<https://alerts.in.ua/api-request>. They send it by e-mail. The token is
+yours: alerts.in.ua links every request made with it to you.
 
-## Actions
+## Step 2: configure
 
-- **Test the weather provider** — performs a live request to Open-Meteo and
-  shows the current temperature and humidity under the button.
-- **Identify a device** — pick one of your devices in the list and it will
-  signal itself (the demo light "blinks" in the logs).
+In Gladys, **Integrations > Ukraine Alarm > Configuration**:
 
-## Scenes
+1. **alerts.in.ua API token**: paste the token. Kept by Gladys in its
+   database, never shown again, sent only to alerts.in.ua (in the
+   `Authorization` header of each request, over HTTPS).
+2. **Locations to watch (UIDs)**: the UIDs of the locations, separated by
+   commas, 20 at most. Examples: `31` Kyiv city, `14` Kyiv Oblast, `1293`
+   Kharkiv city, `564` Zaporizhzhia city.
+   - The button **Find a location** gives the UID of an oblast, a raion or a
+     city from part of its name, in Ukrainian or Latin letters (`Kharkiv`,
+     `Львів`). It sends no request.
+   - A hromada: take its UID from the
+     [full list of the locations](https://docs.google.com/spreadsheets/d/1XnTOzcPHd1LZUrarR1Fk43FUyl8Ae6a6M7pcwDRjNdA/edit?usp=sharing)
+     linked by the API documentation. Its device is named "Alerts: Location <UID>":
+     rename it in Gladys.
+3. **Read interval**: 30 s by default, 20 s to 600 s. One request reads every
+   location at once.
+4. Save, then **Test the connection**: it reads alerts.in.ua and shows the
+   level of each location.
+5. In the **Discover** tab, add the devices you want. Nothing is read before a
+   device is added.
 
-The integration adds its own cards to the scene editor (Gladys 5.1 or
-later), under the **Integrations** category:
+## How it reads
 
-- **Motion detected** (trigger) — starts the scene when a demo motion sensor
-  sees something move. Optionally pick the sensor and what moved (person,
-  animal); left empty, any detection matches. The following actions can
-  read what moved with `{{triggerEvent.data.target}}`.
-- **Identify a device** (action) — makes the chosen device signal itself.
-  It returns whether the device could signal itself, so the following
-  actions can depend on it.
+- One GET request per interval, whatever the number of locations, with
+  `If-Modified-Since` (alerts.in.ua answers "not modified" when nothing
+  changed). One request at a time.
+- alerts.in.ua allows 8 to 10 requests a minute per Internet address (12 is the
+  hard limit, then the address and the token are blocked). Other applications
+  behind the same address count too: this is why 20 s is the fastest interval.
+- The pace survives a restart: the time of each attempt is written to the
+  integration folder before the request, and the next read waits for the end
+  of the interval.
+- The **Test the connection** button sends no new request less than 20 s after
+  the last one: it then shows the last answer.
 
-## Dashboard
+## When something goes wrong
 
-Add the **Demo status** widget to a dashboard: it shows the live
-temperature of the weather station and the power of the office plug, the
-connection the plug currently uses (orange when degraded) and the observed
-location. Its **Identify the light** button makes the demo light signal
-itself.
+| What happens                                                                 | What the integration does                                                                                                                               |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The token is refused (HTTP 401)                                              | No automatic read any more. Saving a new token, or the test button reading with success, starts the reads again. The status says so.                    |
+| HTTP 403 (your address is blocked, or the API is not served in your country) | Not a refusal of the token: reads paused 30 min, then 1 h, 2 h... up to 6 h.                                                                            |
+| Too many requests (HTTP 429)                                                 | Reads paused for the time alerts.in.ua asks (`Retry-After`), else 1 min doubling; between 1 min and 6 h.                                                |
+| Server error, timeout, network, an answer cut or unreadable                  | Not a refusal: retried after one interval, then the wait doubles each time, up to 15 min (30 s, 1 min, 2, 4, 8, then 15 min with the default interval). |
+| No good read for 10 min                                                      | The status says the levels shown are not recent.                                                                                                        |
+| A UID without data                                                           | The status names it; its device gets no level.                                                                                                          |
 
-## Troubleshooting
+The pauses and the refusal are kept in the integration folder (`/data`) and
+survive a restart. Of a refused token, only 8 bits of a salted hash are kept,
+never the token.
 
-The integration logs everything it does: check the integration logs from the
-Gladys UI (or `docker logs` on the host) with `LOG_LEVEL=debug` for the full
-detail.
+## Scene events after a restart or an outage
+
+The last level of each location is kept for 2 hours. After a restart or an
+outage, the first read is compared with it: an alert that started (or ended)
+meanwhile fires its trigger with "seen late" set. A level older than 2 hours
+is not compared: no trigger for a change that may be hours old.
+
+## Limits
+
+- The level comes from the compact "IoT" status of alerts.in.ua (v2, with the
+  red and yellow levels). An active alert given without a level (`A`) counts
+  as red.
+- Whether the status of a hromada also shows an alert declared for its whole
+  oblast is up to alerts.in.ua (not checked without a real token).
+- Only air raid alerts: the other threats of alerts.in.ua (artillery, urban
+  fights, chemical, nuclear) and the details of each threat are not read in
+  this version.
+- The names of the raions are in Ukrainian only.
+
+## Privacy
+
+The integration sends nothing but the token and its own User-Agent
+(`gladys-ukraine-alarm/<version>`) to api.alerts.in.ua. It never follows a
+redirect. The token is never written to the logs, the status, nor the
+integration folder.
+
+## Source
+
+Data: [alerts.in.ua](https://alerts.in.ua), volunteer project; API:
+<https://devs.alerts.in.ua>. Source code: Apache-2.0,
+<https://github.com/LM1LC3N7/gladys-ukraine-alarm>.

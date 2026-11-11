@@ -1,45 +1,79 @@
 // -----------------------------------------------------------------------------
-// Integration configuration.
-//
-// The configuration is filled in by the user in Gladys, from the `config_schema`
-// declared in `gladys-assistant-integration.json`. The SDK fetches it for you
-// (`gladys.getConfig()`) and notifies you of every change through
-// `gladys.onConfigUpdated()`.
-//
-// This module only provides defaults and normalizes the received object, so the
-// rest of the code never has to deal with `undefined`.
+// The configuration the user fills (manifest `config_schema`), normalized.
+// The token is checked, never shown: it only travels in the Authorization
+// header of the requests to api.alerts.in.ua.
 // -----------------------------------------------------------------------------
 
-// Defaults: they MUST stay consistent with the `default` values declared in the
-// `config_schema` of the manifest.
+import { MAX_LOCATIONS, MAX_TOKEN_LENGTH, MAX_UID, READ_INTERVAL } from './constants.js';
+
+/** Defaults: they MUST match the `default` values of the manifest. */
 export const DEFAULT_CONFIG = {
-  latitude: 48.8566, // Paris
-  longitude: 2.3522,
-  unit: 'celsius', // 'celsius' | 'fahrenheit'
-  // Seconds between two reads of the polled sensors. Gladys polls at most once
-  // a minute: slower intervals are applied by skipping polls (see
-  // createPoller in src/devices/index.js).
-  poll_frequency: 300,
-  // Reserved key (NOT in config_schema): because the manifest declares both
-  // 'local' and 'cloud' in its `transports` field, Gladys shows a standard
-  // "Prefer the local connection" toggle and sends the user's choice here.
-  // Read-only for the integration; defaults to true.
-  GLADYS_PREFER_LOCAL: true,
+  read_interval: READ_INTERVAL.default,
+};
+
+/** A token: printable ASCII, no space nor control character, bounded. */
+const TOKEN = /^[\x21-\x7e]+$/;
+
+/** 'missing' | 'invalid' | 'ok' */
+export function tokenState(token) {
+  if (!token) {
+    return 'missing';
+  }
+  return token.length <= MAX_TOKEN_LENGTH && TOKEN.test(token) ? 'ok' : 'invalid';
+}
+
+const integer = (value, { min, max, default: fallback }) => {
+  if (value === '' || value === null || value === undefined || typeof value === 'boolean') {
+    return fallback;
+  }
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, Math.round(n)));
 };
 
 /**
- * Merge the user config with the defaults.
- * @param {Record<string, unknown>} raw config returned by the SDK
+ * The UIDs typed by the user: integers separated by commas, semicolons,
+ * spaces or lines. What is not a UID is kept apart (shown in the status,
+ * cut short), duplicates are dropped, MAX_LOCATIONS at most.
  */
+export function parseLocations(value) {
+  const uids = [];
+  const invalid = [];
+  let dropped = 0;
+  for (const entry of String(value ?? '').split(/[\s,;]+/)) {
+    if (!entry) {
+      continue;
+    }
+    const uid = /^\d{1,4}$/.test(entry) ? Number(entry) : Number.NaN;
+    if (!Number.isInteger(uid) || uid < 1 || uid > MAX_UID) {
+      if (invalid.length < 3) {
+        invalid.push(entry.slice(0, 12));
+      }
+      continue;
+    }
+    if (uids.includes(uid)) {
+      continue;
+    }
+    if (uids.length >= MAX_LOCATIONS) {
+      dropped += 1;
+      continue;
+    }
+    uids.push(uid);
+  }
+  return { uids, invalid, dropped };
+}
+
 export function normalizeConfig(raw = {}) {
+  const token = typeof raw?.api_token === 'string' ? raw.api_token.trim() : '';
+  const { uids, invalid, dropped } = parseLocations(raw?.locations);
   return {
-    ...DEFAULT_CONFIG,
-    ...raw,
-    // Force the types: config may arrive as strings from a form.
-    latitude: Number(raw.latitude ?? DEFAULT_CONFIG.latitude),
-    longitude: Number(raw.longitude ?? DEFAULT_CONFIG.longitude),
-    poll_frequency: Number(raw.poll_frequency ?? DEFAULT_CONFIG.poll_frequency),
-    // The preference is a boolean; anything but an explicit false means true.
-    GLADYS_PREFER_LOCAL: raw.GLADYS_PREFER_LOCAL !== false,
+    token,
+    tokenState: tokenState(token),
+    uids,
+    invalidLocations: invalid,
+    droppedLocations: dropped,
+    readInterval: integer(raw?.read_interval, READ_INTERVAL),
   };
 }
