@@ -35,12 +35,12 @@ const integer = (value, { min, max, default: fallback }) => {
 
 /**
  * The UIDs typed by the user: integers separated by commas, semicolons,
- * spaces or lines. What is not a UID is kept apart (shown in the status,
- * cut short), duplicates are dropped, MAX_LOCATIONS at most.
+ * spaces or lines. What is not a UID is only counted (never shown: it may be a
+ * secret pasted in the wrong field), duplicates are dropped, MAX_LOCATIONS at most.
  */
 export function parseLocations(value) {
   const uids = [];
-  const invalid = [];
+  let invalid = 0;
   let dropped = 0;
   for (const entry of String(value ?? '').split(/[\s,;]+/)) {
     if (!entry) {
@@ -48,9 +48,8 @@ export function parseLocations(value) {
     }
     const uid = /^\d{1,4}$/.test(entry) ? Number(entry) : Number.NaN;
     if (!Number.isInteger(uid) || uid < 1 || uid > MAX_UID) {
-      if (invalid.length < 3) {
-        invalid.push(entry.slice(0, 12));
-      }
+      // Counted, never quoted: a token pasted here by mistake must not reach the status.
+      invalid += 1;
       continue;
     }
     if (uids.includes(uid)) {

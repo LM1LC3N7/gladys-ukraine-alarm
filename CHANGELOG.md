@@ -25,3 +25,8 @@ uses [semantic versioning](https://semver.org/).
   and "Find a location" (UID of an oblast, raion or city by name, Ukrainian or
   Latin letters, no request).
 - English and French guides.
+- An entry of the locations that is not a UID is counted, never quoted (a
+  token pasted there by mistake never reaches the status).
+- The test button sends one request for clicks of the same moment; the token
+  goes only over https to api.alerts.in.ua; levels aged on the monotonic clock;
+  levels written to /data before the scene events.

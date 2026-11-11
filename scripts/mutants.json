@@ -92,8 +92,8 @@
   {
     "name": "token sent to another host",
     "file": "src/api.js",
-    "from": "if (new URL(url).host !== API_HOST) {",
-    "to": "if (false) {"
+    "from": "    target.host !== API_HOST ||\n",
+    "to": ""
   },
   {
     "name": "Retry-After date against the local clock",
@@ -104,7 +104,7 @@
   {
     "name": "old level compared after 2 h",
     "file": "src/app.js",
-    "from": "const known = previous && now - previous.at <= EVENT_MEMORY ? previous : null;",
+    "from": "const known = previous && mono - previous.mono <= EVENT_MEMORY ? previous : null;",
     "to": "const known = previous ?? null;"
   },
   {
@@ -128,8 +128,8 @@
   {
     "name": "test button faster than 20 s",
     "file": "src/app.js",
-    "from": "if (this.attemptMono !== null && mono - this.attemptMono < TEST_SPACING) {",
-    "to": "if (false) {"
+    "from": "    if (this.tooSoon(mono)) {\n      return this.recentAnswer(mono);",
+    "to": "    if (false) {\n      return this.recentAnswer(mono);"
   },
   {
     "name": "never stale",
@@ -166,5 +166,83 @@
     "file": "src/api.js",
     "from": "      if (signal.aborted) {\n        throw new ApiError('timeout');\n      }\n      if (done) {",
     "to": "      if (done) {"
+  },
+  {
+    "name": "tag without salt",
+    "file": "src/app.js",
+    "from": "update(`${salt}\\u0000${token}`, 'utf8')",
+    "to": "update(`${token}`, 'utf8')"
+  },
+  {
+    "name": "generation not checked after the save",
+    "file": "src/app.js",
+    "from": "    await this.save();\n    if (generation !== this.generation) {\n      return { ok: false, code: 'stale' };\n    }\n    const still",
+    "to": "    await this.save();\n    const still"
+  },
+  {
+    "name": "pause from /data not capped",
+    "file": "src/app.js",
+    "from": "const left = Math.min(Math.max(0, pause.until - now), PAUSE_MAX);",
+    "to": "const left = Math.max(0, pause.until - now);"
+  },
+  {
+    "name": "refusal from /data of another status",
+    "file": "src/app.js",
+    "from": "      refused.status === 401\n",
+    "to": "      true\n"
+  },
+  {
+    "name": "attempt from /data in the future",
+    "file": "src/app.js",
+    "from": "      attempt.at <= now + MINUTE &&\n",
+    "to": ""
+  },
+  {
+    "name": "304 without cache taken as data",
+    "file": "src/app.js",
+    "from": "} else if (!cached) {",
+    "to": "} else if (false) {"
+  },
+  {
+    "name": "If-Modified-Since without cache",
+    "file": "src/app.js",
+    "from": "lastModified: cached ? this.lastModified : null,",
+    "to": "lastModified: this.lastModified ?? 'Thu, 01 Jan 1970 00:00:00 GMT',"
+  },
+  {
+    "name": "http accepted",
+    "file": "src/api.js",
+    "from": "    target.protocol !== 'https:' ||\n",
+    "to": ""
+  },
+  {
+    "name": "user in the URL accepted",
+    "file": "src/api.js",
+    "from": "    target.username !== '' ||\n",
+    "to": ""
+  },
+  {
+    "name": "test button not shared between clicks",
+    "file": "src/app.js",
+    "from": "this.testRead ??= this.exclusive(",
+    "to": "this.testRead = this.exclusive("
+  },
+  {
+    "name": "test spacing not checked again in its turn",
+    "file": "src/app.js",
+    "from": "this.tooSoon(this.monotonic()) ? { ok: false, code: 'recent' } : this.read({ force: true }),",
+    "to": "this.read({ force: true }),"
+  },
+  {
+    "name": "levels aged on the wall clock",
+    "file": "src/app.js",
+    "from": "const known = previous && mono - previous.mono <= EVENT_MEMORY ? previous : null;",
+    "to": "const known = previous && now - previous.at <= EVENT_MEMORY ? previous : null;"
+  },
+  {
+    "name": "events before the levels are saved",
+    "file": "src/app.js",
+    "from": "    await this.save();\n    for (const change of changes) {",
+    "to": "    for (const change of changes) {"
   }
 ]

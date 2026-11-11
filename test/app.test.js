@@ -561,7 +561,7 @@ test('locations: invalid entries and the 21st are told, duplicates dropped', asy
   const env = await setup({ config: { ...CONFIG, locations: `31, 31, abc, ${many}` } });
   t.after(() => env.app.stop());
   assert.equal(env.gladys.fake.discoveredDevices.length, 20);
-  assert.match(text(env), /Not a UID, ignored: abc/);
+  assert.match(text(env), /1 entry of the locations ignored: not a UID/);
   assert.match(text(env), /3 more locations ignored: 20 at most/);
 });
 
@@ -660,4 +660,156 @@ test('a read overtaken while in flight (whatever the cause) publishes nothing', 
   await env.wait(0);
   assert.equal(env.gladys.fake.lastState(F(31)), 0);
   assert.deepEqual(env.gladys.fake.sceneEvents, []);
+});
+
+test('a token pasted in the locations by mistake is never shown nor logged, not even in part', async (t) => {
+  const pasted = 'abcDEF123456789ghiJKL0987654321';
+  const env = await setup({ config: { ...CONFIG, locations: `31, ${pasted}` } });
+  t.after(() => env.app.stop());
+  await env.wait(MINUTE);
+  const seen = JSON.stringify([env.lines, env.gladys.fake.connectionStatuses]);
+  for (let i = 0; i + 4 <= pasted.length; i += 1) {
+    assert.ok(!seen.includes(pasted.slice(i, i + 4)), pasted.slice(i, i + 4));
+  }
+  assert.match(text(env), /1 entry of the locations ignored/);
+});
+
+test('the test button is atomic: three clicks at the same moment send one request', async (t) => {
+  const env = await setup({ config: { ...CONFIG, read_interval: 600 } });
+  t.after(() => env.app.stop());
+  await env.wait(25 * SECOND);
+  assert.equal(env.net.count(), 1);
+  const acks = await Promise.all([
+    env.app.testConnection(),
+    env.app.testConnection(),
+    env.app.testConnection(),
+  ]);
+  assert.equal(env.net.count(), 2);
+  for (const ack of acks) assert.match(ack.en, /Token accepted/);
+});
+
+test('the token changed while the attempt is written to /data: one request, with the new token', async (t) => {
+  const store = createMemoryStore();
+  const save = store.save.bind(store);
+  let hold = null;
+  store.save = (data) => (hold ? hold.then(() => save(data)) : save(data));
+  const env = await setup({ store, config: { ...CONFIG, read_interval: 600 } });
+  t.after(() => env.app.stop());
+  assert.equal(env.net.count(), 1);
+  await env.wait(25 * SECOND);
+  let release;
+  hold = new Promise((resolve) => (release = resolve));
+  const test = env.app.testConnection();
+  await env.flush();
+  assert.equal(env.net.count(), 1, 'the attempt is being written');
+  await env.gladys.fake.configUpdated({
+    ...CONFIG,
+    read_interval: 600,
+    api_token: 'NewToken1234567890',
+  });
+  release();
+  hold = null;
+  await test;
+  await env.wait(0);
+  assert.equal(env.net.count(), 2);
+  assert.equal(env.net.calls[1].init.headers.Authorization, 'Bearer NewToken1234567890');
+});
+
+test('a pause read from /data is capped to 6 h, whatever its end says', async (t) => {
+  const store = createMemoryStore({
+    pause: { kind: 'rate', until: NOW + 30 * 24 * HOUR, count: 1 },
+  });
+  const env = await setup({ store });
+  t.after(() => env.app.stop());
+  await env.wait(5 * HOUR);
+  assert.equal(env.net.count(), 0);
+  const spent = await until(env, () => env.net.count() >= 1, { max: 2 * HOUR });
+  assert.ok(spent <= HOUR + MINUTE);
+});
+
+test('/data values that cannot be ours are ignored: refusal not 401, attempt in the future', async (t) => {
+  const store = createMemoryStore({
+    refused: {
+      salt: '0123456789abcdef0123456789abcdef',
+      tag: tagOf('0123456789abcdef0123456789abcdef', TOKEN),
+      status: 403,
+    },
+    attempt: { at: NOW + 2 * HOUR, failures: 0 },
+  });
+  const env = await setup({ store });
+  t.after(() => env.app.stop());
+  assert.equal(env.net.count(), 1);
+});
+
+test('a wall clock jump between two reads does not age the levels: the alert still fires', async (t) => {
+  const env = await setup();
+  t.after(() => env.app.stop());
+  env.wall.offset = 3 * HOUR;
+  env.net.current = statuses({ 31: 'Y' });
+  await env.wait(30 * SECOND);
+  const started = events(env, 'alert_started');
+  assert.equal(started.length, 1);
+  assert.equal(started[0].late, false);
+  env.wall.offset = -5 * HOUR;
+  env.net.current = statuses({ 31: 'N' });
+  await env.wait(30 * SECOND);
+  assert.equal(events(env, 'alert_ended')[0].duration_minutes, 1);
+});
+
+test('the levels are in /data before the events fire: a restart does not fire them again', async (t) => {
+  const store = createMemoryStore();
+  const env = await setup({ store });
+  let savedLevel = null;
+  const publish = env.gladys.publishSceneEvent.bind(env.gladys);
+  env.gladys.publishSceneEvent = (key, data) => {
+    savedLevel = store.data.levels['31'].level;
+    return publish(key, data);
+  };
+  env.net.current = statuses({ 31: 'R' });
+  await env.wait(30 * SECOND);
+  assert.equal(savedLevel, 3);
+  await env.app.stop();
+  const again = await setup({ store, now: env.clock.now + MINUTE, connect: false });
+  t.after(() => again.app.stop());
+  again.net.current = statuses({ 31: 'R' });
+  await again.gladys.connect();
+  await again.wait(MINUTE);
+  assert.deepEqual(again.gladys.fake.sceneEvents, []);
+});
+
+test('a 304 without a previous answer is not taken as data', async (t) => {
+  const env = await setup({ connect: false });
+  t.after(() => env.app.stop());
+  env.net.world = () => new Response(null, { status: 304 });
+  await env.gladys.connect();
+  await env.wait(0);
+  assert.equal(env.net.calls[0].init.headers['If-Modified-Since'], undefined);
+  assert.match(text(env), /could not be read \(unreadable\)/);
+  assert.equal(env.gladys.fake.lastState(F(31)), undefined);
+});
+
+test('a click and a loop read of the same moment: one request, the click answers from it', async (t) => {
+  const env = await setup({ config: { ...CONFIG, read_interval: 600 } });
+  t.after(() => env.app.stop());
+  await env.wait(25 * SECOND);
+  const loop = env.app.exclusive(() => env.app.read());
+  const ack = await env.app.testConnection();
+  await loop;
+  assert.equal(env.net.count(), 2);
+  assert.match(ack.en, /Last read \d+ s ago/);
+});
+
+test('a click while a read hangs answers at once from the last one, without waiting for it', async (t) => {
+  const env = await setup({ config: { ...CONFIG, read_interval: 30 }, requestTimeout: 60_000 });
+  t.after(() => env.app.stop());
+  const held = [];
+  env.net.world = () => new Promise((resolve) => held.push(resolve));
+  await env.wait(30 * SECOND);
+  assert.equal(held.length, 1);
+  let answered = null;
+  env.app.testConnection().then((a) => (answered = a));
+  await env.flush();
+  assert.match(answered?.en ?? '', /Last read \d+ s ago/);
+  held[0](answer(statuses()));
+  await env.wait(0);
 });

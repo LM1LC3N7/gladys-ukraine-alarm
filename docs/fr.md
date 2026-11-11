@@ -94,7 +94,10 @@ Dans Gladys, **Intégrations > Ukraine Alarm > Configuration** :
 
 Les pauses et le refus sont gardés dans le dossier de l’intégration (`/data`)
 et tiennent après un redémarrage. D’un jeton refusé, seuls 8 bits d’une
-empreinte salée sont gardés, jamais le jeton.
+empreinte salée sont gardés, jamais le jeton. Deux jetons ont les mêmes 8 bits
+une fois sur 256 : si un nouveau jeton enregistré après un redémarrage tombe
+sur ceux du jeton refusé, cliquez une fois sur **Tester la connexion** pour
+relancer les lectures.
 
 ## Événements de scène après un redémarrage ou une panne
 
@@ -102,7 +105,10 @@ Le dernier niveau de chaque lieu est gardé 2 heures. Après un redémarrage ou 
 panne, la première lecture lui est comparée : une alerte commencée (ou
 terminée) entre-temps déclenche sa scène avec « vue en retard ». Un niveau de
 plus de 2 heures n’est pas comparé : aucun déclenchement pour un changement qui
-date peut-être de plusieurs heures.
+date peut-être de plusieurs heures. Les nouveaux niveaux sont écrits dans le
+dossier de l’intégration avant les déclenchements ; si ce dossier n’est pas
+inscriptible, un déclenchement peut partir une seconde fois après un
+redémarrage (au moins une fois, jamais perdu).
 
 ## Limites
 

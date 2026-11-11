@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { ApiError, fetchStatuses, levelOf, parseStatuses, retryAfterMs } from '../src/api.js';
 import { normalizeConfig, parseLocations, tokenState } from '../src/config.js';
 import { LOCATIONS, fold, locationName, searchLocations } from '../src/locations.js';
+import { tagOf } from '../src/app.js';
 import { answer, statuses } from './helpers/world.js';
 
 const call = (response, extra = {}) =>
@@ -167,13 +168,13 @@ test('tokenState and the configuration', () => {
 test('parseLocations: integers 1 to 9999, duplicates dropped, 20 at most, the rest told', () => {
   assert.deepEqual(parseLocations('31, 14, 31, 0, 10000, 1.5, -3, ab, 22'), {
     uids: [31, 14, 22],
-    invalid: ['0', '10000', '1.5'],
+    invalid: 5,
     dropped: 0,
   });
   const many = parseLocations(Array.from({ length: 25 }, (_, i) => i + 1).join(' '));
   assert.equal(many.uids.length, 20);
   assert.equal(many.dropped, 5);
-  assert.deepEqual(parseLocations(undefined), { uids: [], invalid: [], dropped: 0 });
+  assert.deepEqual(parseLocations(undefined), { uids: [], invalid: 0, dropped: 0 });
 });
 
 test('the location names: oblasts with English, raions, an unknown UID', () => {
@@ -193,4 +194,39 @@ test('the location names: oblasts with English, raions, an unknown UID', () => {
   );
   assert.deepEqual(searchLocations('a'), []);
   assert.ok(searchLocations('район').length <= 15);
+});
+
+test('fetchStatuses: the token goes over https to api.alerts.in.ua only, no user nor port', async () => {
+  for (const url of [
+    'http://api.alerts.in.ua/v2/iot/active_air_raid_alerts.json',
+    'https://api.alerts.in.ua.evil.com/v2/iot/active_air_raid_alerts.json',
+    'https://x.alerts.in.ua/v2/iot/active_air_raid_alerts.json',
+    'https://user@api.alerts.in.ua/v2/iot/active_air_raid_alerts.json',
+    'https://user:pw@api.alerts.in.ua/v2/iot/active_air_raid_alerts.json',
+    'https://api.alerts.in.ua:8443/v2/iot/active_air_raid_alerts.json',
+  ]) {
+    let sent = false;
+    const code = await codeOf(
+      fetchStatuses({
+        token: 'tok',
+        version: '0.1.0',
+        timeoutMs: 100,
+        url,
+        fetchImpl: async () => {
+          sent = true;
+          return answer(statuses());
+        },
+      }),
+    );
+    assert.equal(code, 'http', url);
+    assert.equal(sent, false, url);
+  }
+});
+
+test('the tag of a refused token depends on its salt', () => {
+  const token = 'TestToken0123456789abcdefABCDEF-xyz';
+  const tags = new Set();
+  for (let i = 0; i < 16; i += 1) tags.add(tagOf(String(i).padStart(32, '0'), token));
+  assert.ok(tags.size > 1, 'the salt changes the tag');
+  assert.ok(Number.isInteger(tagOf('a'.repeat(32), token)) && tagOf('a'.repeat(32), token) < 256);
 });

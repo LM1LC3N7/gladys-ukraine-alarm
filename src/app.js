@@ -136,6 +136,7 @@ export class App {
     this.reading = false;
     this.lastStatus = null;
     this.connectSeq = 0;
+    this.testRead = null;
   }
 
   // --- Lifecycle -------------------------------------------------------------
@@ -392,7 +393,15 @@ export class App {
         ) {
           continue;
         }
-        this.levels.set(uid, { level: entry.level, at: entry.at, since: entry.since });
+        // Its age on the monotonic clock from here on (the wall clock is read once).
+        const age = Math.max(0, now - entry.at);
+        this.levels.set(uid, {
+          level: entry.level,
+          at: entry.at,
+          since: entry.since,
+          mono: mono - age,
+          sinceMono: entry.since === null ? null : mono - Math.max(0, now - entry.since),
+        });
       }
     }
   }
@@ -400,7 +409,7 @@ export class App {
   snapshot() {
     const levels = {};
     for (const [uid, entry] of this.levels) {
-      levels[uid] = entry;
+      levels[uid] = { level: entry.level, at: entry.at, since: entry.since };
     }
     return {
       version: 1,
@@ -669,7 +678,9 @@ export class App {
     if (!this.statuses || !this.linked) {
       return;
     }
+    const generation = this.generation;
     const now = this.now();
+    const mono = this.monotonic();
     const states = [];
     const changes = [];
     for (const uid of this.createdUids()) {
@@ -682,14 +693,17 @@ export class App {
         continue;
       }
       const previous = this.levels.get(uid);
-      const known = previous && now - previous.at <= EVENT_MEMORY ? previous : null;
+      const known = previous && mono - previous.mono <= EVENT_MEMORY ? previous : null;
       let since = null;
-      if (isAlert(level)) {
-        since = known && isAlert(known.level) ? known.since : known ? now : null;
+      let sinceMono = null;
+      if (isAlert(level) && known) {
+        const going = isAlert(known.level);
+        since = going ? known.since : now;
+        sinceMono = going ? known.sinceMono : mono;
       }
-      this.levels.set(uid, { level, at: now, since });
+      this.levels.set(uid, { level, at: now, since, mono, sinceMono });
       if (known) {
-        changes.push({ uid, before: known, level, now });
+        changes.push({ uid, before: known, level, mono });
       }
     }
     if (states.length > 0) {
@@ -699,19 +713,29 @@ export class App {
         this.logger.warn(`States not published: ${err?.message ?? err}`);
       }
     }
+    if (changes.length === 0) {
+      return;
+    }
+    // The new levels in /data before the events: a restart does not fire them
+    // again (a /data that cannot be written: they may fire twice, never lost).
+    await this.save();
     for (const change of changes) {
+      // Stopped or overtaken meanwhile: nothing more is fired.
+      if (!this.running || generation !== this.generation) {
+        return;
+      }
       await this.fireEvents(change);
     }
   }
 
   /** The changes of one location: started (or escalated to red), ended. */
-  async fireEvents({ uid, before, level, now }) {
+  async fireEvents({ uid, before, level, mono }) {
     const common = {
       location: idsOf(this.gladys, uid).device,
       uid,
       location_name: locationName(uid),
       // The previous level is older than two intervals: a restart, an outage.
-      late: now - before.at > 2 * this.interval() + MINUTE,
+      late: mono - before.mono > 2 * this.interval() + MINUTE,
     };
     if (isAlert(level) && (!isAlert(before.level) || level > before.level)) {
       await this.sendEvent(SCENE_TRIGGERS.started, {
@@ -723,7 +747,9 @@ export class App {
       await this.sendEvent(SCENE_TRIGGERS.ended, {
         ...common,
         duration_minutes:
-          before.since === null ? null : Math.max(0, Math.round((now - before.since) / MINUTE)),
+          before.sinceMono === null
+            ? null
+            : Math.max(0, Math.round((mono - before.sinceMono) / MINUTE)),
       });
     }
   }
@@ -774,7 +800,7 @@ export class App {
     const now = this.now();
     const wallOf = (due) => now + Math.max(0, due - mono);
     const notes = [];
-    if (this.config.invalidLocations.length > 0) {
+    if (this.config.invalidLocations > 0) {
       notes.push(STATUS.invalidLocations(this.config.invalidLocations));
     }
     if (this.config.droppedLocations > 0) {
@@ -862,15 +888,20 @@ export class App {
       const until = this.now() + (this.pause.due - mono);
       return this.pause.kind === 'rate' ? STATUS.paused(until) : STATUS.denied(until);
     }
-    if (this.attemptMono !== null && mono - this.attemptMono < TEST_SPACING) {
-      if (this.refused) return STATUS.refused(this.refused.status);
-      if (this.failures > 0 || !this.statuses) {
-        return STATUS.failing(this.lastError ?? 'pending', this.now() + TEST_SPACING);
-      }
-      const seconds = Math.max(0, Math.round((mono - this.readingMono) / 1000));
-      return TEST.recent(seconds, this.levelLines());
+    if (this.tooSoon(mono)) {
+      return this.recentAnswer(mono);
     }
-    const result = await this.exclusive(() => this.read({ force: true }));
+    // One read for every click of the same moment (the clicks share it), the
+    // spacing checked again when its turn comes (the loop may have read just before).
+    this.testRead ??= this.exclusive(() =>
+      this.tooSoon(this.monotonic()) ? { ok: false, code: 'recent' } : this.read({ force: true }),
+    ).finally(() => {
+      this.testRead = null;
+    });
+    const result = await this.testRead;
+    if (result.code === 'recent') {
+      return this.recentAnswer(this.monotonic());
+    }
     if (result.ok) {
       return TEST.ok(this.levelLines());
     }
@@ -882,6 +913,20 @@ export class App {
         : STATUS.denied(this.pause.until);
     }
     return STATUS.failing(result.code, this.now() + Math.max(0, this.nextDue - this.monotonic()));
+  }
+
+  tooSoon(mono) {
+    return this.attemptMono !== null && mono - this.attemptMono < TEST_SPACING;
+  }
+
+  /** The answer of the test button from the last request (no new one). */
+  recentAnswer(mono) {
+    if (this.refused) return STATUS.refused(this.refused.status);
+    if (this.failures > 0 || !this.statuses) {
+      return STATUS.failing(this.lastError ?? 'pending', this.now() + TEST_SPACING);
+    }
+    const seconds = Math.max(0, Math.round((mono - this.readingMono) / 1000));
+    return TEST.recent(seconds, this.levelLines());
   }
 
   /** "Find a location": the UIDs whose name holds the words typed. No request. */

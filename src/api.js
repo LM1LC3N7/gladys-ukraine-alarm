@@ -150,7 +150,13 @@ export async function fetchStatuses({
   lastModified = null,
   url = API_URL,
 }) {
-  if (new URL(url).host !== API_HOST) {
+  const target = new URL(url);
+  if (
+    target.protocol !== 'https:' ||
+    target.host !== API_HOST ||
+    target.username !== '' ||
+    target.password !== ''
+  ) {
     throw new ApiError('http');
   }
   const headers = {

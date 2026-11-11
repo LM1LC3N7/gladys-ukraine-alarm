@@ -92,14 +92,19 @@ In Gladys, **Integrations > Ukraine Alarm > Configuration**:
 
 The pauses and the refusal are kept in the integration folder (`/data`) and
 survive a restart. Of a refused token, only 8 bits of a salted hash are kept,
-never the token.
+never the token. Two tokens share the same 8 bits once in 256: if a new
+token saved after a restart happens to match the refused one, click **Test the
+connection** once to start the reads.
 
 ## Scene events after a restart or an outage
 
 The last level of each location is kept for 2 hours. After a restart or an
 outage, the first read is compared with it: an alert that started (or ended)
 meanwhile fires its trigger with "seen late" set. A level older than 2 hours
-is not compared: no trigger for a change that may be hours old.
+is not compared: no trigger for a change that may be hours old. The new levels
+are written to the integration folder before the triggers fire; if that folder
+cannot be written, a trigger may fire a second time after a restart (at least
+once, never lost).
 
 ## Limits
 

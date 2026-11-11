@@ -76,10 +76,10 @@ export const STATUS = {
       `No data for the UID ${uids.join(', ')}: check it (button "Find a location", or the full list linked above).`,
       `Aucune donnée pour l’UID ${uids.join(', ')} : vérifiez-le (bouton « Chercher un lieu », ou la liste complète en lien ci-dessus).`,
     ),
-  invalidLocations: (entries) =>
+  invalidLocations: (n) =>
     both(
-      `Not a UID, ignored: ${entries.join(', ')}.`,
-      `Pas un UID, ignoré : ${entries.join(', ')}.`,
+      `${n} ${plural(n, 'entry', 'entries')} of the locations ignored: not a UID (1 to 9999).`,
+      `${n} ${plural(n, 'entrée ignorée', 'entrées ignorées')} dans les lieux : pas un UID (1 à 9999).`,
     ),
   droppedLocations: (n, max) =>
     both(
